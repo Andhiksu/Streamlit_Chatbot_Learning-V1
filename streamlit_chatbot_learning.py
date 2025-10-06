@@ -41,7 +41,7 @@ if _parse_ver(_genai_ver) < (1, 0):
 # =====================
 APP_TITLE = "🚀StudyBuddy AI — Chatbot Teman Belajar"
 MODEL_NAME = "gemini-2.5-pro"
-PROMPT_FILE = "prompts_chatbot_learning.txt"
+PROMPT_FILE = "prompts_guru_pintar.txt"
 
 
 # =====================
@@ -214,12 +214,47 @@ KELUARKAN **HANYA** JSON VALID sesuai skema (tanpa penjelasan tambahan).
     )
     text = resp.text
     try:
-        return json.loads(text)
+        data = json.loads(text)
     except Exception:
         start, end = text.find("{"), text.rfind("}")
         if start != -1 and end != -1 and end > start:
-            return json.loads(text[start:end + 1])
-        raise ValueError("Gagal parse JSON kuis dari model.")
+            data = json.loads(text[start:end + 1])
+        else:
+            raise ValueError("Gagal parse JSON kuis dari model.")
+
+    # Transform data to match expected schema
+    items = []
+    if isinstance(data, list):
+        for i, q in enumerate(data):
+            opts = [q['options'][let] for let in 'ABCD' if let in q['options']]
+            ans_idx = ord(q['answer']) - ord('A')
+            items.append({
+                "id": f"q{i+1}",
+                "question": q['question'],
+                "options": opts,
+                "answer_index": ans_idx,
+                "explanation": q.get('explanation', ""),
+            })
+        data = {"topic": topic_text[:50] if topic_text else "Unknown", "level": difficulty, "items": items}
+    elif "questions" in data:
+        for i, q in enumerate(data["questions"]):
+            opts = [q['options'][let] for let in 'ABCD' if let in q['options']]
+            ans_idx = ord(q.get("correct_answer", "A")) - ord('A')
+            items.append({
+                "id": q.get("question_id", f"q{i+1}"),
+                "question": q.get("question_text", q.get("question", "")),
+                "options": opts,
+                "answer_index": ans_idx,
+                "explanation": q.get("explanation", ""),
+            })
+        data["items"] = items
+        data["topic"] = data.get("quiz_title", data.get("topic", topic_text[:50] if topic_text else "Unknown"))
+        data["level"] = data.get("level", difficulty)
+        del data["questions"]
+    elif "items" not in data:
+        raise ValueError(f"JSON missing 'items' key: {data}")
+
+    return data
 
 
 def show_progress():
@@ -301,6 +336,12 @@ def render_quiz_area(client, prompts):
                     except Exception as e:
                         st.error(f"Gagal membuat kuis: {e}")
         else:
+            if "items" not in st.session_state["quiz"]:
+                st.error(f"Struktur kuis tidak valid: {st.session_state['quiz']}")
+                if st.button("Ulangi Buat Kuis"):
+                    st.session_state["quiz"] = None
+                    st.rerun()
+                return
             qdata = st.session_state["quiz"]["items"]
             idx = st.session_state["quiz_idx"]
             if idx >= len(qdata):
@@ -332,6 +373,8 @@ def render_quiz_area(client, prompts):
                             st.warning("Pilih satu jawaban dulu!")
                         else:
                             st.session_state["answers"][item["id"]] = choice
+                            correct = (choice == item["answer_index"])
+                            update_progress(item["id"], correct, st.session_state["difficulty"])
                             st.session_state["current_answered"] = True
                             st.rerun()
             else:
@@ -339,7 +382,6 @@ def render_quiz_area(client, prompts):
                 if selected is not None:
                     st.write(f"**Jawaban Anda:** {['A','B','C','D'][selected]}. {item['options'][selected]}")
                 correct = (selected == item["answer_index"])
-                update_progress(item["id"], correct, st.session_state["difficulty"])
                 if correct:
                     st.success("Benar! ✅")
                 else:
@@ -421,7 +463,7 @@ def main():
     prompts = load_prompts(PROMPT_FILE)
 
     st.title(APP_TITLE)
-    st.caption("Teman belajar yang membantu kamu memahami materi dengan cara interaktif — unggah materi atau masukkan topik yang ingin kamu pelajari, lakukan tanya-jawab, ikuti kuis, dan tinjau kembali konsep yang belum dikuasai.")
+    st.caption("Teman belajar cerdas yang membantu kamu memahami materi dengan cara interaktif — unggah materi, lakukan tanya-jawab, ikuti kuis adaptif, dan tinjau kembali konsep yang belum dikuasai.")
 
     # ---- Sidebar: Pengaturan & Upload ----
     with st.sidebar:
@@ -465,9 +507,9 @@ def main():
 
             # Input Topik dan Explore
             context_input = st.text_input(
-                "Tidak ada file? Masukkan topik yang ingin dipelajari:",
+                "Topik Hari Ini?",
                 key="context_text",
-                placeholder="Contoh: Matematika, fisika, kimia...",
+                placeholder="Contoh: Limit & Derivatif Kalkulus...",
                 help="Deskripsikan topik yang ingin dipelajari"
             )
 
