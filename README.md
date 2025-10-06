@@ -18,7 +18,7 @@ StudyBuddy AI adalah aplikasi chatbot interaktif berbasis Streamlit dan Google G
 ### Instalasi
 1. Kloning Repository:
 ```text
-git clone https://github.com/username/studybuddy-ai.git
+git clone https://github.com/andhiksu/studybuddy-ai.git
 cd studybuddy-ai
 ```
 2. Buat Environment Virtual (disarankan):
