@@ -2,6 +2,7 @@ import os
 import json
 import time
 import tempfile
+import re
 from typing import List, Dict, Any
 
 import streamlit as st
@@ -41,7 +42,7 @@ if _parse_ver(_genai_ver) < (1, 0):
 # =====================
 APP_TITLE = "🚀StudyBuddy AI — Chatbot Teman Belajar"
 MODEL_NAME = "gemini-2.5-pro"
-PROMPT_FILE = "prompts_guru_pintar.txt"
+PROMPT_FILE = "prompts_chatbot_learning.txt"
 
 
 # =====================
@@ -80,6 +81,7 @@ def ensure_state():
         "quiz_idx": 0,
         "answers": {},
         "current_answered": False,
+        "current_revealed": False,
         "progress": {
             "total_attempts": 0,
             "total_correct": 0,
@@ -196,7 +198,7 @@ Petunjuk kuis:
 Jumlah soal: {n_items}
 Level: {difficulty}
 
-KELUARKAN **HANYA** JSON VALID sesuai skema (tanpa penjelasan tambahan).
+KELUARKAN **HANYA** JSON VALID sesuai skema (tanpa penjelasan tambahan, tanpa markdown, tanpa kode block).
 """
     initial_parts = [gx.Part(text=prompt)]
     for file_ref in files or []:
@@ -212,49 +214,83 @@ KELUARKAN **HANYA** JSON VALID sesuai skema (tanpa penjelasan tambahan).
         contents=contents,
         config=config,
     )
-    text = resp.text
+    text = resp.text.strip()
+    
+    # Bersihkan jika ada markdown code block
+    if text.startswith('```json'):
+        text = text[7:].strip()
+    if text.endswith('```'):
+        text = text[:-3].strip()
+    
+    # Coba parse JSON
     try:
-        data = json.loads(text)
-    except Exception:
-        start, end = text.find("{"), text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            data = json.loads(text[start:end + 1])
+        quiz_data = json.loads(text)
+    except json.JSONDecodeError as e:
+        # Fallback: ekstrak bagian JSON
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            try:
+                quiz_data = json.loads(json_str)
+            except json.JSONDecodeError:
+                raise ValueError(f"Gagal parse JSON kuis dari model. Output: {text[:500]}... Error: {e}")
         else:
-            raise ValueError("Gagal parse JSON kuis dari model.")
+            raise ValueError(f"Gagal parse JSON kuis dari model. Output: {text[:500]}... Error: {e}")
 
-    # Transform data to match expected schema
-    items = []
-    if isinstance(data, list):
-        for i, q in enumerate(data):
-            opts = [q['options'][let] for let in 'ABCD' if let in q['options']]
-            ans_idx = ord(q['answer']) - ord('A')
-            items.append({
-                "id": f"q{i+1}",
-                "question": q['question'],
-                "options": opts,
-                "answer_index": ans_idx,
-                "explanation": q.get('explanation', ""),
-            })
-        data = {"topic": topic_text[:50] if topic_text else "Unknown", "level": difficulty, "items": items}
-    elif "questions" in data:
-        for i, q in enumerate(data["questions"]):
-            opts = [q['options'][let] for let in 'ABCD' if let in q['options']]
-            ans_idx = ord(q.get("correct_answer", "A")) - ord('A')
-            items.append({
-                "id": q.get("question_id", f"q{i+1}"),
-                "question": q.get("question_text", q.get("question", "")),
-                "options": opts,
-                "answer_index": ans_idx,
-                "explanation": q.get("explanation", ""),
-            })
-        data["items"] = items
-        data["topic"] = data.get("quiz_title", data.get("topic", topic_text[:50] if topic_text else "Unknown"))
-        data["level"] = data.get("level", difficulty)
-        del data["questions"]
-    elif "items" not in data:
-        raise ValueError(f"JSON missing 'items' key: {data}")
+    # Normalize structure to match expected schema
+    if "questions" in quiz_data:
+        quiz_data["items"] = quiz_data.pop("questions")
+    if "quiz_name" in quiz_data:
+        quiz_data["topic"] = quiz_data.pop("quiz_name")
+    if "topic" not in quiz_data:
+        quiz_data["topic"] = topic_text.strip()[:100] if topic_text.strip() else "Kuis Umum"
+    if "level" not in quiz_data:
+        quiz_data["level"] = difficulty
 
-    return data
+    if "items" not in quiz_data or not isinstance(quiz_data["items"], list):
+        raise ValueError(f"JSON kuis tidak memiliki 'items' yang valid. Data: {quiz_data}")
+    if len(quiz_data["items"]) == 0:
+        st.warning("Model menghasilkan kuis kosong. Menggunakan struktur dasar.")
+        quiz_data["items"] = []
+
+    for i, item in enumerate(quiz_data["items"]):
+        # Map question_text to question
+        if "question_text" in item:
+            item["question"] = item.pop("question_text")
+        if "question" not in item:
+            raise ValueError(f"Item {i} tidak memiliki 'question'. Data: {item}")
+
+        # Handle options: dict to list
+        if isinstance(item.get("options"), dict):
+            opt_dict = item["options"]
+            item["options"] = [opt_dict.get(letter, "") for letter in "ABCD"]
+        if "options" not in item or len(item["options"]) != 4:
+            raise ValueError(f"Item {i} tidak memiliki 4 opsi valid. Data: {item}")
+
+        # Handle correct_answer: str 'A' to int index
+        if "correct_answer" in item:
+            corr_ans = item["correct_answer"].strip().upper()
+            if corr_ans in "ABCD":
+                item["answer_index"] = ord(corr_ans) - ord("A")
+            else:
+                raise ValueError(f"Item {i} correct_answer tidak valid: {corr_ans}")
+            del item["correct_answer"]
+        if "answer_index" not in item or not isinstance(item["answer_index"], int) or item["answer_index"] not in range(4):
+            raise ValueError(f"Item {i} tidak memiliki answer_index valid (0-3). Data: {item}")
+
+        # Set id
+        if "question_number" in item:
+            item["id"] = f"q{item.pop('question_number')}"
+        if "id" not in item:
+            item["id"] = f"q{i+1}"
+
+        # Defaults
+        if "explanation" not in item:
+            item["explanation"] = ""
+        if "tags" not in item:
+            item["tags"] = []
+
+    return quiz_data
 
 
 def show_progress():
@@ -275,6 +311,9 @@ def show_progress():
 
 
 def update_progress(qid: str, correct: bool, level: str):
+    # Prevent double update if already in history
+    if any(h["id"] == qid for h in st.session_state["progress"]["history"]):
+        return
     prog = st.session_state["progress"]
     prog["total_attempts"] += 1
     if correct:
@@ -331,15 +370,20 @@ def render_quiz_area(client, prompts):
                         st.session_state["quiz_idx"] = 0
                         st.session_state["answers"] = {}
                         st.session_state["current_answered"] = False
+                        st.session_state["current_revealed"] = False
                         st.success("Kuis siap!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal membuat kuis: {e}")
         else:
-            if "items" not in st.session_state["quiz"]:
-                st.error(f"Struktur kuis tidak valid: {st.session_state['quiz']}")
-                if st.button("Ulangi Buat Kuis"):
+            if "items" not in st.session_state["quiz"] or not st.session_state["quiz"]["items"]:
+                st.error("Kuis tidak valid. Coba buat ulang.")
+                if st.button("Ulangi Kuis"):
                     st.session_state["quiz"] = None
+                    st.session_state["quiz_idx"] = 0
+                    st.session_state["answers"] = {}
+                    st.session_state["current_answered"] = False
+                    st.session_state["current_revealed"] = False
                     st.rerun()
                 return
             qdata = st.session_state["quiz"]["items"]
@@ -352,6 +396,7 @@ def render_quiz_area(client, prompts):
                     st.session_state["quiz_idx"] = 0
                     st.session_state["answers"] = {}
                     st.session_state["current_answered"] = False
+                    st.session_state["current_revealed"] = False
                     st.rerun()
                 return
 
@@ -359,39 +404,54 @@ def render_quiz_area(client, prompts):
             st.markdown(f"**Soal {idx + 1} / {len(qdata)}**")
             st.write(item["question"])
             answered = st.session_state.get("current_answered", False)
+            choice_key = f"choice_{item['id']}"
             if not answered:
-                choice = st.radio(
+                st.radio(
                     "Pilih jawaban:",
                     options=list(range(4)),
-                    format_func=lambda i: f"{['A','B','C','D'][i]}. {item['options'][i]}",
-                    key=f"q_{item['id']}_{idx}",
+                    format_func=lambda i: f"{chr(65 + i)}. {item['options'][i]}",
+                    key=choice_key,
                 )
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("Kunci Jawaban", use_container_width=True):
-                        if choice is None:
+                    if st.button("📤 Submit Jawaban", use_container_width=True):
+                        selected_choice = st.session_state.get(choice_key, None)
+                        if selected_choice is None:
                             st.warning("Pilih satu jawaban dulu!")
-                        else:
-                            st.session_state["answers"][item["id"]] = choice
-                            correct = (choice == item["answer_index"])
-                            update_progress(item["id"], correct, st.session_state["difficulty"])
-                            st.session_state["current_answered"] = True
                             st.rerun()
+                        st.session_state["answers"][item["id"]] = selected_choice
+                        is_correct = (selected_choice == item["answer_index"])
+                        update_progress(item["id"], is_correct, st.session_state["difficulty"])
+                        st.session_state["current_answered"] = True
+                        st.session_state["current_revealed"] = False
+                        st.rerun()
             else:
                 selected = st.session_state["answers"].get(item["id"], None)
                 if selected is not None:
-                    st.write(f"**Jawaban Anda:** {['A','B','C','D'][selected]}. {item['options'][selected]}")
-                correct = (selected == item["answer_index"])
-                if correct:
-                    st.success("Benar! ✅")
+                    st.write(f"**Jawaban Anda:** {chr(65 + selected)}. {item['options'][selected]}")
+                is_correct = (selected == item["answer_index"])
+                if is_correct:
+                    st.success("✅ Benar!")
                 else:
-                    st.error(f"Salah. ❌ **Jawaban benar:** {['A','B','C','D'][item['answer_index']]} . {item['options'][item['answer_index']]}")
-                with st.expander("Penjelasan"):
-                    st.write(item.get("explanation", ""))
-                if st.button("Lanjut ➡️", use_container_width=True):
-                    st.session_state["quiz_idx"] += 1
-                    st.session_state["current_answered"] = False
-                    st.rerun()
+                    st.error("❌ Salah!")
+                if not st.session_state["current_revealed"]:
+                    if st.button("🔑 Kunci Jawaban & Penjelasan", use_container_width=True):
+                        st.session_state["current_revealed"] = True
+                        st.rerun()
+                else:
+                    if not is_correct:
+                        st.info(f"**Jawaban Benar:** {chr(65 + item['answer_index'])}. {item['options'][item['answer_index']]}")
+                    with st.expander("📖 Penjelasan", expanded=True):
+                        st.write(item.get("explanation", "Tidak ada penjelasan."))
+                col_lanjut = st.columns(1)
+                with col_lanjut[0]:
+                    if st.button("➡️ Lanjut ke soal berikutnya", use_container_width=True):
+                        st.session_state["quiz_idx"] += 1
+                        st.session_state["current_answered"] = False
+                        st.session_state["current_revealed"] = False
+                        if choice_key in st.session_state:
+                            del st.session_state[choice_key]
+                        st.rerun()
 
 
 def render_review_area(client, prompts):
@@ -443,6 +503,7 @@ def reset_all():
     st.session_state["quiz_idx"] = 0
     st.session_state["answers"] = {}
     st.session_state["current_answered"] = False
+    st.session_state["current_revealed"] = False
     st.session_state["progress"] = {
         "total_attempts": 0,
         "total_correct": 0,
@@ -463,7 +524,7 @@ def main():
     prompts = load_prompts(PROMPT_FILE)
 
     st.title(APP_TITLE)
-    st.caption("Teman belajar cerdas yang membantu kamu memahami materi dengan cara interaktif — unggah materi, lakukan tanya-jawab, ikuti kuis adaptif, dan tinjau kembali konsep yang belum dikuasai.")
+    st.caption("Teman belajar yang membantu kamu memahami materi dengan cara interaktif — unggah materi atau masukkan topik yang ingin kamu pelajari, lakukan tanya-jawab, ikuti kuis, dan tinjau kembali konsep yang belum dikuasai.")
 
     # ---- Sidebar: Pengaturan & Upload ----
     with st.sidebar:
@@ -507,9 +568,9 @@ def main():
 
             # Input Topik dan Explore
             context_input = st.text_input(
-                "Topik Hari Ini?",
+                "Tidak ada file? Masukkan topik yang ingin dipelajari:",
                 key="context_text",
-                placeholder="Contoh: Limit & Derivatif Kalkulus...",
+                placeholder="Contoh: Matematika, fisika, kimia...",
                 help="Deskripsikan topik yang ingin dipelajari"
             )
 
