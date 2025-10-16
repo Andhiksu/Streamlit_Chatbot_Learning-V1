@@ -1,6 +1,7 @@
 # Streamlit Chatbot Learning - V1
 ![WhatsApp Image 2025-10-06 at 08 59 48](https://github.com/user-attachments/assets/1fec3e72-dd53-4fb6-8015-65ef9cfd828d)
 
+[More - Streamlit User Interface](https://drive.google.com/file/d/1yoltcfXPI1i2_mMaXePF3bspyEgboJZn/view)
 
 StudyBuddy AI adalah aplikasi chatbot interaktif berbasis Streamlit dan Google Gemini yang dirancang sebagai teman belajar virtual. Aplikasi ini membantu siswa memahami materi pelajaran melalui tanya-jawab, kuis adaptif, dan review konsep yang sulit. Unggah file materi (PDF, TXT, MD) atau masukkan topik, lalu eksplorasi dengan cara yang menyenangkan dan efektif.
 
