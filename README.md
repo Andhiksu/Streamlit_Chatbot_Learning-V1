@@ -3,81 +3,81 @@
 
 [More - Streamlit User Interface](https://drive.google.com/file/d/1yoltcfXPI1i2_mMaXePF3bspyEgboJZn/view)
 
-StudyBuddy AI adalah aplikasi chatbot interaktif berbasis Streamlit dan Google Gemini yang dirancang sebagai teman belajar virtual. Aplikasi ini membantu siswa memahami materi pelajaran melalui tanya-jawab, kuis adaptif, dan review konsep yang sulit. Unggah file materi (PDF, TXT, MD) atau masukkan topik, lalu eksplorasi dengan cara yang menyenangkan dan efektif.
+**StudyBuddy AI** is an interactive chatbot app built with Streamlit and Google Gemini, designed as your virtual study buddy. It helps students dive into lesson materials through casual Q&A sessions, adaptive quizzes, and quick reviews of those tricky concepts. Just upload your study files (PDF, TXT, MD) or drop in a topic, and start exploring in a fun, effective way.
 
-### Fitur Utama
-- Mode Belajar (Chat): Tanya-jawab bebas tentang materi, dengan dukungan file konteks untuk jawaban yang akurat.
-- Mode Kuis: Buat kuis pilihan ganda otomatis dengan tingkat kesulitan (mudah, sedang, sulit). Lacak progres akurasi dan riwayat jawaban.
-- Mode Review: Ringkas konsep sulit berdasarkan jawaban salah sebelumnya, dengan tips dan latihan cepat.
-- Upload File: Integrasi dengan Google Gemini File API untuk menganalisis PDF, TXT, atau Markdown sebagai konteks belajar.
-- Progres Tracking: Metrik percobaan, akurasi, dan ringkasan 5 jawaban terakhir.
-- Bahasa Indonesia: Semua interaksi ramah dan adaptif dalam bahasa Indonesia.
-- Reset & Pengaturan: Mudah reset data dan sesuaikan mode serta level kesulitan.
+### **Key Features**
+- **Learning Mode (Chat)**: Jump into free-flowing Q&A about your materials, backed by file context for spot-on answers.
+- **Quiz Mode**: Generate automatic multiple-choice quizzes with adjustable difficulty levels (easy, medium, hard). Track your accuracy progress and answer history.
+- **Review Mode**: Summarize tough concepts based on your past mistakes, complete with tips and quick practice drills.
+- **File Upload**: Seamless integration with Google Gemini File API to analyze PDFs, TXT files, or Markdown as your learning context.
+- **Progress Tracking**: Metrics on attempts, accuracy, and a summary of your last 5 answers.
+- **Indonesian Language Support**: All interactions are friendly and adaptive in Bahasa Indonesia.
+- **Reset & Settings**: Easily wipe your data and tweak modes or difficulty levels on the fly.
 
-### Persyaratan Sistem
+### **System Requirements**
 - Python 3.8+
-- Streamlit 1.36.0 atau lebih tinggi
-- Akses ke Google AI Studio (untuk API Key Gemini)
+- Streamlit 1.36.0 or higher
+- Access to Google AI Studio (for your Gemini API Key)
 
-### Instalasi
-1. Kloning Repository:
+### **Installation**
+1. Clone the Repository:
 ```text
 git clone https://github.com/andhiksu/studybuddy-ai.git
 cd studybuddy-ai
 ```
-2. Buat Environment Virtual (disarankan):
+2. Create a Virtual Environment (recommended):
 ```text
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # atau
 venv\Scripts\activate  # Windows
 ```
-3. Instal Dependensi:
+3. Install Dependencies:
 ```text
 pip install -r requirements.txt
 ```
-File `requirements.txt` mencakup:
+The `requirements.txt` file includes:
 - `streamlit>=1.36.0`
 - `google-genai>=1.0.0`
 - `pypdf>=5.0.0`
-4. Dapatkan API Key:
-  - Dapatkan API Key [Google AI Studio](https://aistudio.google.com/app/api-keys)
-  - Buat API Key baru dan simpan aman.
+4. Get Your API Key:
+  - Head over to [Google AI Studio](https://aistudio.google.com/app/api-keys) to grab your API Key.
+  - Create a new one and keep it safe.
  
-### Cara Menjalankan
-1. Jalankan aplikasi:
+### **Running the App**
+1. Launch the Application:
 ```text
 streamlit run streamlit_chatbot_learning.py
 ```
-2. Buka browser di `http://localhost:8501`.
-3. Di sidebar:
-   - Masukkan API Key Gemini dan klik Set API Key.
-   -  Unggah file materi atau masukkan topik (misalnya: "Fisika Kuantum").
-   -  Pilih mode (Belajar, Kuis, Review) dan tingkat kesulitan.
-   -  Klik Explore Topik untuk mulai.
+2. Open in Your Browser: Navigate to `http://localhost:8501`.
+3. In the Sidebar:
+   - Enter your Gemini API Key and hit "Set API Key".
+   - Upload a study file or type in a topic (e.g., "Quantum Physics").
+   - Pick a mode (Learning, Quiz, Review) and difficulty level.
+   - Click "Explore Topic" to get started.
 
-Aplikasi akan otomatis memuat prompts dari `prompts_chatbot_learning.txt` untuk instruksi sistem dan kuis.
+The app will automatically load prompts from `prompts_chatbot_learning.txt` for system instructions and quiz generation.
 
-### Penggunaan
-- API Key: Wajib untuk mengakses Gemini.
-- Upload File: Dukung PDF/TXT/MD; file diunggah ke Gemini File API untuk konteks.
-- Topik Manual: Jika tanpa file, masukkan deskripsi topik untuk eksplorasi.
-- Mode & Level: Pilih interaksi (Belajar untuk chat, Kuis untuk tes, Review untuk ulasan).
-- Reset: Hapus semua data dan mulai baru.
+### **Usage**
+- API Key: Required to tap into Gemini—don't skip this!
+- File Upload: Supports PDF/TXT/MD; files get uploaded to the Gemini File API for context.
+- Manual Topic: No file? Just describe the topic for on-the-fly exploration.
+- Modes & Levels: Choose your vibe—Learning for chats, Quiz for tests, Review for recaps.
+- Reset: Clear everything and start fresh whenever you want.
 
-### Struktur Project
+### **Project Structure**
 ```text
 studybuddy-ai/
-├── streamlit_chatbot_learning.py  # Aplikasi utama Streamlit
-├── prompts_chatbot_learning.txt   # Template prompts untuk sistem, kuis, dan review
-├── requirements.txt               # Dependensi Python
-└── README.md                      # Dokumen ini
+├── streamlit_chatbot_learning.py  # Main Streamlit app
+├── prompts_chatbot_learning.txt   # Prompt templates for system, quizzes, and reviews
+├── requirements.txt               # Python dependencies
+└── README.md                      # This doc
 ```
-- streamlit_chatbot_learning.py: Logika inti, termasuk upload file, generate respons, dan rendering UI.
-- prompts_chatbot_learning.txt: Konfigurasi prompt Gemini (sistem role, instruksi JSON kuis, tips review).
+- `streamlit_chatbot_learning.py`: Core logic, including file uploads, response generation, and UI rendering.
+- `prompts_chatbot_learning.txt`: Gemini prompt configs (system roles, JSON quiz instructions, review tips).
 
-### Troubleshooting
-- Error API Key: Pastikan google-genai>=1.0.0 terinstal; restart app setelah update.
-- Upload Gagal: Cek MIME type file; app otomatis deteksi PDF/TXT/MD.
-- JSON Kuis Rusak: Model Gemini kadang output tidak sempurna; app coba parse otomatis.
-- No Internet: App butuh akses Gemini API; pastikan koneksi stabil.
+### **Troubleshooting**
+- API Key Errors: Make sure `google-genai>=1.0.0` is installed; restart the app after updates.
+- Upload Failures: Check your file's MIME type; the app auto-detects PDF/TXT/MD.
+- Broken Quiz JSON: Gemini models can be quirky with outputs— the app tries to parse it automatically.
+- No Internet?: The app needs a stable connection to the Gemini API, so double-check your setup.
